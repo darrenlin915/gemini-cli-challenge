@@ -36,7 +36,7 @@ resource "google_cloudbuild_trigger" "pr_trigger" {
   }
 
   filename        = "cloudbuild-pr.yaml"
-  service_account = "projects/${var.gcp_project_id}/serviceAccounts/636965397022@cloudbuild.gserviceaccount.com"
+  service_account = "projects/${var.gcp_project_id}/serviceAccounts/636965397022-compute@developer.gserviceaccount.com"
 
   depends_on = [
     module.enable_google_apis
@@ -61,7 +61,7 @@ resource "google_cloudbuild_trigger" "main_push_trigger" {
   ignored_files = ["environments/**"]
 
   filename        = "cloudbuild.yaml"
-  service_account = "projects/${var.gcp_project_id}/serviceAccounts/636965397022@cloudbuild.gserviceaccount.com"
+  service_account = "projects/${var.gcp_project_id}/serviceAccounts/636965397022-compute@developer.gserviceaccount.com"
 
   depends_on = [
     module.enable_google_apis
