@@ -1,0 +1,20 @@
+apiVersion: cloud.google.com/v1
+kind: ComputeClass
+metadata:
+  name: online-boutique
+spec:
+  priorities:
+    - machineFamily: e2
+      spot: true
+    - machineFamily: n2
+      spot: true
+    - machineFamily: n2d
+      spot: true
+    - machineFamily: e2
+      spot: false
+    - machineFamily: n2
+      spot: false
+    - machineFamily: n2d
+      spot: false
+  nodepoolAutoCreation:
+    enabled: true
