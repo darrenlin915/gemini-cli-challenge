@@ -20,16 +20,30 @@ steps:
     --default-repo=us-central1-docker.pkg.dev/$PROJECT_ID/microservices-demo
     --tag=${SHORT_SHA};
 
-# Step 2: Update Helm values for all environments with the new image tag
+# Step 2: Fetch GitHub token from Secret Manager
+- id: 'Fetch GitHub token'
+  name: 'gcr.io/cloud-builders/gcloud'
+  entrypoint: 'bash'
+  args:
+  - '-c'
+  - |
+    gcloud secrets versions access latest \
+      --secret=demo-github-oauthtoken-a94e28 \
+      --project=${PROJECT_ID} > /workspace/github_token.txt
+
+# Step 3: Update Helm values for all environments with the new image tag
 - id: 'Update Helm values'
   name: 'gcr.io/cloud-builders/git'
   entrypoint: 'bash'
   args:
   - '-c'
   - |
-    # Configure git
+    GITHUB_TOKEN=$(cat /workspace/github_token.txt)
+
+    # Configure git with token auth
     git config user.name "Cloud Build"
     git config user.email "cloudbuild@${PROJECT_ID}.iam.gserviceaccount.com"
+    git remote set-url origin https://x-access-token:$${GITHUB_TOKEN}@github.com/${_GITHUB_OWNER}/${_GITHUB_REPO}.git
     git fetch origin main
     git checkout main
 
@@ -47,6 +61,9 @@ steps:
     git add environments/
     git commit -m "chore(cd): update image tag to ${SHORT_SHA} [skip ci]"
     git push origin main
+
+    # Cleanup token
+    rm -f /workspace/github_token.txt
 
 timeout: '3600s'
 options:
