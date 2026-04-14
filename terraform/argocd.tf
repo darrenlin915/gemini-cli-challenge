@@ -6,7 +6,7 @@ resource "helm_release" "argocd" {
   chart            = "argo-cd"
   namespace        = "argocd"
   create_namespace = true
-  
+
   # Wait until ArgoCD pods are ready before finishing Terraform apply
   wait = true
 
