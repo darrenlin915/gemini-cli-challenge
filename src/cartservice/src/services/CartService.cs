@@ -46,6 +46,11 @@ namespace cartservice.services
 
         public async override Task<Empty> EmptyCart(EmptyCartRequest request, ServerCallContext context)
         {
+            // Bug: Randomly throw exceptions to simulate instability
+            if (new Random().Next(0, 3) == 0) // 33% chance to fail
+            {
+                throw new RpcException(new Status(StatusCode.Internal, "Random internal error in CartService."));
+            }
             await _cartStore.EmptyCartAsync(request.UserId);
             return Empty;
         }
