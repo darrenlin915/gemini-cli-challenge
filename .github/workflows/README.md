@@ -1,65 +1,93 @@
-# GitHub Actions Workflows
+# Gemini CLI Workflows
 
-This page describes the CI/CD workflows for the Online Boutique app, which run in [Github Actions](https://github.com/GoogleCloudPlatform/microservices-demo/actions).
+This directory contains a collection of example workflows that demonstrate how to use the [Google Gemini CLI GitHub Action](https://github.com/google-github-actions/run-gemini-cli). These workflows are designed to be reusable and customizable for your own projects.
 
-## Infrastructure
+- [Gemini CLI Workflows](#gemini-cli-workflows)
+  - [Available Workflows](#available-workflows)
+  - [Setup](#setup)
+  - [Customizing Workflows](#customizing-workflows)
+  - [Awesome Workflows](#awesome-workflows)
+    - [Share Your Workflow](#share-your-workflow)
 
-The CI/CD pipelines for Online Boutique run in Github Actions, using a pool of two [self-hosted runners]((https://help.github.com/en/actions/automating-your-workflow-with-github-actions/about-self-hosted-runners)). These runners are GCE instances (virtual machines) that, for every open Pull Request in the repo, run the code test pipeline, deploy test pipeline, and (on main) deploy the latest version of the app to [cymbal-shops.retail.cymbal.dev](https://cymbal-shops.retail.cymbal.dev)
+## Available Workflows
 
-We also host a test GKE cluster, which is where the deploy tests run. Every PR has its own namespace in the cluster.
+- **[Gemini Dispatch](./gemini-dispatch)**: A central dispatcher that routes requests to the appropriate workflow based on the triggering event and the command provided in the comment.
+- **[Issue Triage](./issue-triage)**: Automatically triage GitHub issues using Gemini. This workflow can be configured to run on a schedule or be triggered by issue events.
+- **[Pull Request Review](./pr-review)**: Automatically review pull requests using Gemini. This workflow can be triggered by pull request events and provides a comprehensive review of the changes.
+- **[Gemini CLI Assistant](./gemini-assistant)**: A general-purpose, conversational AI assistant that can be invoked within pull requests and issues to perform a wide range of tasks.
 
-## Workflows
+## Setup
 
-**Note**: In order for the current CI/CD setup to work on your pull request, you must branch directly off the repo (no forks). This is because the Github secrets necessary for these tests aren't copied over when you fork.
+For detailed setup instructions, including prerequisites and authentication, please refer to the main [Authentication documentation](../../docs/authentication.md).
 
-### Code Tests - [ci-pr.yaml](ci-pr.yaml)
+To use a workflow, you can utilize either of the following steps:
 
-These tests run on every commit for every open PR, as well as any commit to main / any release branch. Currently, this workflow runs only Go unit tests.
+- Run the `/setup-github` command in Gemini CLI on your terminal to set up workflows for your repository.
+- Copy the workflow files into your repository's `.github/workflows` directory.
 
+## Customizing Workflows
 
-### Deploy Tests- [ci-pr.yaml](ci-pr.yaml)
+Gemini CLI workflows are highly configurable. You can adjust their behavior by editing the corresponding `.yml` files in your repository.
 
-These tests run on every commit for every open PR, as well as any commit to main / any release branch. This workflow:
+For detailed configuration options, including Gemini CLI settings, timeouts, and permissions, see our [Configuration Guide](./CONFIGURATION.md).
 
-1. Creates a dedicated GKE namespace for that PR, if it doesn't already exist, in the PR GKE cluster.
-2. Uses `skaffold run` to build and push the images specific to that PR commit. Then skaffold deploys those images, via `kubernetes-manifests`, to the PR namespace in the test cluster.
-3. Tests to make sure all the pods start up and become ready.
-4. Gets the LoadBalancer IP for the frontend service.
-5. Comments that IP in the pull request, for staging.
+## Awesome Workflows
 
-### Push and Deploy Latest - [push-deploy](push-deploy.yml)
+Discover awesome workflows created by the community! These are publicly available workflows that showcase creative and powerful uses of the Gemini CLI GitHub Action.
 
-This is the Continuous Deployment workflow, and it runs on every commit to the main branch. This workflow:
+👉 **[View all Awesome Workflows](./AWESOME.md)**
 
-1. Builds the container images for every service, tagging as `latest`.
-2. Pushes those images to Google Container Registry.
+### Share Your Workflow
 
-Note that this workflow does not update the image tags used in `release/kubernetes-manifests.yaml` - these release manifests are tied to a stable `v0.x.x` release.
+Have you created an awesome workflow using Gemini CLI? We'd love to feature it in our [Awesome Workflows](./AWESOME.md) page!
 
-### Cleanup - [cleanup.yaml](cleanup.yaml)
+**Submission Process:**
 
-This workflow runs when a PR closes, regardless of whether it was merged into main. This workflow deletes the PR-specific GKE namespace in the test cluster.
+1. **Ensure your workflow is public** and well-documented
+2. **Fork this repository** and create a new branch
+3. **Add your workflow** to the appropriate category section in [AWESOME.md](./AWESOME.md) using the [workflow template](./AWESOME.md#workflow-template)
+   - If none of the existing categories fit your workflow, feel free to propose a new category
+4. **Open a pull request** with your addition
+5. **Include a brief summary** in your PR description of what your workflow does and why it's awesome
 
-## Appendix - Creating a new Actions runner
+**What makes a workflow "awesome"?**
 
-Should one of the two self-hosted Github Actions runners (GCE instances) fail, or you want to add more runner capacity, this is how to provision a new runner. Note that you need IAM access to the admin Online Boutique GCP project in order to do this.
+- Solves a real problem or provides significant value
+- Is well-documented with clear setup instructions
+- Follows best practices for security and performance
+- Has been tested and is actively maintained
+- Includes example configurations or use cases
 
-1. Create a GCE instance.
-    - VM should be at least n1-standard-4 with 50GB persistent disk
-    - VM should use custom service account with permissions to: access a GKE cluster, create GCS storage buckets, and push to GCR.
-2. SSH into new VM through the Google Cloud Console.
-3. Install project-specific dependencies, including go, docker, skaffold, and kubectl:
+**Note:** This process is specifically for sharing community workflows. We also recommend reading our [CONTRIBUTING.md](../../CONTRIBUTING.md) file for general contribution guidelines and best practices that apply to all pull requests.
 
+**Workflow Template:**
+
+When adding your workflow to [AWESOME.md](./AWESOME.md), use this format:
+
+```markdown
+#### <Workflow Name>
+
+**Repository:** [<owner>/<repo>](https://github.com/<owner>/<repo>)
+
+Brief description of what the workflow does and its key features.
+
+**Key Features:**
+
+- Feature 1
+- Feature 2
+- Feature 3
+
+**Setup Requirements:**
+
+- Requirement 1
+- Requirement 2 (if any)
+
+**Example Use Cases:**
+
+- Use case 1
+- Use case 2
+
+**Workflow File:** [View on GitHub](https://github.com/<owner>/<repo>/blob/main/.github/workflows/<workflow-name>.yml)
 ```
-wget -O - https://raw.githubusercontent.com/GoogleCloudPlatform/microservices-demo/main/.github/workflows/install-dependencies.sh | bash
-```
 
-The instance will restart when the script completes in order to finish the Docker install.
-
-4. SSH back into the VM.
-
-5. Follow the instructions to add a new runner on the [Actions Settings page](https://github.com/GoogleCloudPlatform/microservices-demo/settings/actions) to authenticate the new runner
-6. Start GitHub Actions as a background service:
-```
-sudo ~/actions-runner/svc.sh install ; sudo ~/actions-runner/svc.sh start
-```
+Browse our [Awesome Workflows](./AWESOME.md) page to see what the community has created!
