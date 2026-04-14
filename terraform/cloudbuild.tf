@@ -63,6 +63,11 @@ resource "google_cloudbuild_trigger" "main_push_trigger" {
   filename        = "cloudbuild.yaml"
   service_account = "projects/${var.gcp_project_id}/serviceAccounts/636965397022-compute@developer.gserviceaccount.com"
 
+  substitutions = {
+    _GITHUB_OWNER = var.github_owner
+    _GITHUB_REPO  = var.github_repo
+  }
+
   depends_on = [
     module.enable_google_apis
   ]
