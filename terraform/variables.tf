@@ -45,3 +45,13 @@ variable "memorystore" {
   type        = bool
   description = "If true, Online Boutique's in-cluster Redis cache will be replaced with a Google Cloud Memorystore Redis cache"
 }
+
+variable "github_owner" {
+  type        = string
+  description = "The owner of the GitHub repository"
+}
+
+variable "github_repo" {
+  type        = string
+  description = "The name of the GitHub repository"
+}
