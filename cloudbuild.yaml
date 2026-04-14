@@ -16,9 +16,9 @@ steps:
   args:
   - '-c'
   - >
-    skaffold build -f=skaffold.yaml
+    skaffold build -f=skaffold.yaml -p ci
     --default-repo=us-central1-docker.pkg.dev/$PROJECT_ID/microservices-demo
-    --tag=${SHORT_SHA};
+    --tag=${SHORT_SHA} --build-concurrency=0;
 
 # Step 2: Fetch GitHub token from Secret Manager
 - id: 'Fetch GitHub token'

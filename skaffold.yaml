@@ -92,6 +92,12 @@ profiles:
   - op: add
     path: /manifests/kustomize/paths/1
     value: kustomize/components/network-policies
+# The "ci" profile builds only linux/amd64 to speed up CI/CD pipelines.
+- name: ci
+  patches:
+  - op: replace
+    path: /build/platforms
+    value: ["linux/amd64"]
 ---
 apiVersion: skaffold/v3
 kind: Config
@@ -120,3 +126,8 @@ profiles:
       diskSizeGb: 300
       machineType: N1_HIGHCPU_32
       timeout: 4000s
+- name: ci
+  patches:
+  - op: replace
+    path: /build/platforms
+    value: ["linux/amd64"]
