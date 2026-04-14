@@ -4,6 +4,11 @@
 # ArgoCD watches environments/*/values.yaml and auto-syncs deployments.
 
 steps:
+# Step 0: Configure Docker auth for Artifact Registry
+- id: 'Configure Docker auth'
+  name: 'gcr.io/cloud-builders/gcloud'
+  args: ['auth', 'configure-docker', 'us-central1-docker.pkg.dev', '--quiet']
+
 # Step 1: Build and push all container images
 - id: 'Build and push images'
   name: 'gcr.io/k8s-skaffold/skaffold:v2.14.1'
@@ -12,7 +17,7 @@ steps:
   - '-c'
   - >
     skaffold build -f=skaffold.yaml
-    --default-repo=us-docker.pkg.dev/$PROJECT_ID/microservices-demo
+    --default-repo=us-central1-docker.pkg.dev/$PROJECT_ID/microservices-demo
     --tag=${SHORT_SHA};
 
 # Step 2: Update Helm values for all environments with the new image tag
@@ -33,7 +38,7 @@ steps:
       cat > environments/$${ENV}/values.yaml <<EOF
     # $${ENV^} Environment Values
     images:
-      repository: us-docker.pkg.dev/${PROJECT_ID}/microservices-demo
+      repository: us-central1-docker.pkg.dev/${PROJECT_ID}/microservices-demo
       tag: "${SHORT_SHA}"
     EOF
     done
