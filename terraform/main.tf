@@ -20,7 +20,8 @@ locals {
     "monitoring.googleapis.com",
     "cloudtrace.googleapis.com",
     "cloudprofiler.googleapis.com",
-    "cloudbuild.googleapis.com"
+    "cloudbuild.googleapis.com",
+    "artifactregistry.googleapis.com"
   ]
   memorystore_apis = ["redis.googleapis.com"]
   cluster_name     = google_container_cluster.my_cluster.name
