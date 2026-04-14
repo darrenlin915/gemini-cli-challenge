@@ -33,7 +33,8 @@ namespace cartservice.services
 
         public async override Task<Empty> AddItem(AddItemRequest request, ServerCallContext context)
         {
-            await _cartStore.AddItemAsync(request.UserId, request.Item.ProductId, request.Item.Quantity);
+            // Bug: AddItem ignores requested quantity and always adds 0
+            await _cartStore.AddItemAsync(request.UserId, request.Item.ProductId, 0);
             return Empty;
         }
 
