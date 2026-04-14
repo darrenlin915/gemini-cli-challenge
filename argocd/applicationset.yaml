@@ -1,0 +1,39 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: onlineboutique-applicationset
+  namespace: argocd
+spec:
+  generators:
+  - list:
+      elements:
+      - env: dev
+        namespace: ob-dev
+      - env: staging
+        namespace: ob-staging
+      - env: prod
+        namespace: ob-prod
+  template:
+    metadata:
+      name: '{{env}}-onlineboutique'
+      namespace: argocd
+    spec:
+      project: default
+      source:
+        repoURL: 'https://github.com/darrenlin915/gemini-cli-challenge.git'
+        targetRevision: HEAD
+        # The base chart is located in `helm-chart` directory
+        path: helm-chart
+        helm:
+          # Use values.yaml from the specific environment directory
+          valueFiles:
+          - '../environments/{{env}}/values.yaml'
+      destination:
+        server: 'https://kubernetes.default.svc'
+        namespace: '{{namespace}}'
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+        - CreateNamespace=true
