@@ -1,2 +1,4 @@
-# Development Environment Values
-# Override the base helm-chart values here
+# Dev Environment Values
+images:
+  repository: us-docker.pkg.dev/ai-for-sre-demo/microservices-demo
+  tag: "latest"
