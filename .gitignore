@@ -28,3 +28,9 @@ pkg/
 release/wi-kubernetes-manifests.yaml
 vendor/
 1st-time-deploy
+
+# gemini-cli settings
+.gemini/
+
+# GitHub App credentials
+gha-creds-*.json
