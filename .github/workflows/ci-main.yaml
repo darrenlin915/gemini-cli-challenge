@@ -120,3 +120,26 @@ jobs:
         if [[ "$ERROR_COUNT" -gt "0" ]]; then
           exit 1
         fi
+    - name: ArgoCD GitOps Update Dev Environment
+      if: github.ref == 'refs/heads/main'
+      run: |
+        echo "Updating dev environment Helm values..."
+        
+        # Configure Git
+        git config user.name "github-actions[bot]"
+        git config user.email "github-actions[bot]@users.noreply.github.com"
+        
+        # Download yq
+        wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
+        chmod a+x /usr/local/bin/yq
+        
+        # Use GITHUB_SHA as the image tag
+        NEW_TAG=${GITHUB_SHA::7}
+        
+        # Update the values file
+        yq e ".images.tag = \"${NEW_TAG}\"" -i environments/dev/values.yaml
+        
+        # Commit and push
+        git add environments/dev/values.yaml
+        git commit -m "chore(gitops): auto-update dev environment image tag to ${NEW_TAG} [skip ci]" || echo "No changes"
+        git push origin main
