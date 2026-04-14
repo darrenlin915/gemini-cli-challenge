@@ -1,2 +1,4 @@
 # Staging Environment Values
-# Override the base helm-chart values here
+images:
+  repository: us-docker.pkg.dev/ai-for-sre-demo/microservices-demo
+  tag: "latest"
