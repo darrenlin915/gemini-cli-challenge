@@ -50,6 +50,15 @@ resource "google_container_cluster" "my_cluster" {
   remove_default_node_pool = true
   initial_node_count       = 1
 
+  # Shielded VM config for the temporary default node pool
+  # Required to comply with compute.requireShieldedVm org policy
+  node_config {
+    shielded_instance_config {
+      enable_secure_boot          = true
+      enable_integrity_monitoring = true
+    }
+  }
+
   # Private cluster: nodes have no external IPs
   private_cluster_config {
     enable_private_nodes    = true

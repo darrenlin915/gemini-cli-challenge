@@ -16,5 +16,6 @@ spec:
       spot: false
     - machineFamily: n2d
       spot: false
-  nodepoolAutoCreation:
+  nodePoolAutoCreation:
     enabled: true
+  whenUnsatisfiable: ScaleUpAnyway
