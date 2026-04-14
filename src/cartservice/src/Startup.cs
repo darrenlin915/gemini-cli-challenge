@@ -35,7 +35,7 @@ namespace cartservice
             {
                 services.AddStackExchangeRedisCache(options =>
                 {
-                    options.Configuration = redisAddress.Remove(redisAddress.Length - 1);
+                    options.Configuration = redisAddress;
                 });
                 services.AddSingleton<ICartStore, RedisCartStore>();
             }
