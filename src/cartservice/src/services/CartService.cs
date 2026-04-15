@@ -33,24 +33,17 @@ namespace cartservice.services
 
         public async override Task<Empty> AddItem(AddItemRequest request, ServerCallContext context)
         {
-            // Bug: AddItem ignores requested quantity and always adds 0
-            await _cartStore.AddItemAsync(request.UserId, request.Item.ProductId, 0);
+            await _cartStore.AddItemAsync(request.UserId, request.Item.ProductId, request.Item.Quantity);
             return Empty;
         }
 
         public override Task<Cart> GetCart(GetCartRequest request, ServerCallContext context)
         {
-            // Bug: Always return an empty cart
-            return Task.FromResult(new Cart { UserId = request.UserId });
+            return _cartStore.GetCartAsync(request.UserId);
         }
 
         public async override Task<Empty> EmptyCart(EmptyCartRequest request, ServerCallContext context)
         {
-            // Bug: Randomly throw exceptions to simulate instability
-            if (new Random().Next(0, 3) == 0) // 33% chance to fail
-            {
-                throw new RpcException(new Status(StatusCode.Internal, "Random internal error in CartService."));
-            }
             await _cartStore.EmptyCartAsync(request.UserId);
             return Empty;
         }
