@@ -1,7 +1,5 @@
-# CD Pipeline: Build images, push to Artifact Registry, update Helm values for ArgoCD
-#
-# Triggered on push to main branch.
-# ArgoCD watches environments/*/values.yaml and auto-syncs deployments.
+# Build and push container images to Artifact Registry.
+# Triggered by GitHub Actions via `gcloud builds submit`.
 
 steps:
 # Step 0: Configure Docker auth for Artifact Registry
@@ -19,51 +17,6 @@ steps:
     skaffold build -f=skaffold.yaml -p ci
     --default-repo=us-central1-docker.pkg.dev/$PROJECT_ID/microservices-demo
     --tag=${SHORT_SHA} --build-concurrency=0;
-
-# Step 2: Fetch GitHub token from Secret Manager
-- id: 'Fetch GitHub token'
-  name: 'gcr.io/cloud-builders/gcloud'
-  entrypoint: 'bash'
-  args:
-  - '-c'
-  - |
-    gcloud secrets versions access latest \
-      --secret=demo-github-oauthtoken-a94e28 \
-      --project=${PROJECT_ID} > /workspace/github_token.txt
-
-# Step 3: Update Helm values for all environments with the new image tag
-- id: 'Update Helm values'
-  name: 'gcr.io/cloud-builders/git'
-  entrypoint: 'bash'
-  args:
-  - '-c'
-  - |
-    GITHUB_TOKEN=$(cat /workspace/github_token.txt)
-
-    # Configure git with token auth
-    git config user.name "Cloud Build"
-    git config user.email "cloudbuild@${PROJECT_ID}.iam.gserviceaccount.com"
-    git remote set-url origin https://x-access-token:$${GITHUB_TOKEN}@github.com/${_GITHUB_OWNER}/${_GITHUB_REPO}.git
-    git fetch origin main
-    git checkout main
-
-    # Update image tag in all environment values files
-    for ENV in dev staging prod; do
-      cat > environments/$${ENV}/values.yaml <<EOF
-    # $${ENV^} Environment Values
-    images:
-      repository: us-central1-docker.pkg.dev/${PROJECT_ID}/microservices-demo
-      tag: "${SHORT_SHA}"
-    EOF
-    done
-
-    # Commit and push
-    git add environments/
-    git commit -m "chore(cd): update image tag to ${SHORT_SHA} [skip ci]"
-    git push origin main
-
-    # Cleanup token
-    rm -f /workspace/github_token.txt
 
 timeout: '3600s'
 options:
