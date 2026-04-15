@@ -49,16 +49,44 @@ jobs:
       id-token: write
     steps:
     - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+    - name: Detect changed services
+      id: changes
+      run: |
+        CHANGED_DIRS=$(git diff --name-only origin/main...HEAD -- src/ | cut -d'/' -f2 | sort -u)
+        SERVICES=""
+        for dir in $CHANGED_DIRS; do
+          case "$dir" in
+            adservice|cartservice|checkoutservice|currencyservice|emailservice|\
+            frontend|loadgenerator|paymentservice|productcatalogservice|\
+            recommendationservice|shippingservice|shoppingassistantservice)
+              SERVICES="${SERVICES:+$SERVICES,}$dir" ;;
+          esac
+        done
+
+        if [ -z "$SERVICES" ]; then
+          echo "has_src_changes=false" >> "$GITHUB_OUTPUT"
+          echo "No source code changes detected — skipping Cloud Build"
+        else
+          echo "has_src_changes=true" >> "$GITHUB_OUTPUT"
+          echo "services=$SERVICES" >> "$GITHUB_OUTPUT"
+          echo "Changed services: $SERVICES"
+        fi
     - id: auth
+      if: steps.changes.outputs.has_src_changes == 'true'
       uses: google-github-actions/auth@v2
       with:
         workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
         service_account: ${{ secrets.WIF_SERVICE_ACCOUNT }}
-    - uses: google-github-actions/setup-gcloud@v2
-    - name: Build images via Cloud Build
+    - if: steps.changes.outputs.has_src_changes == 'true'
+      uses: google-github-actions/setup-gcloud@v2
+    - name: Build and push changed images via Cloud Build
+      if: steps.changes.outputs.has_src_changes == 'true'
       timeout-minutes: 30
       run: |
         gcloud builds submit \
           --config=cloudbuild-pr.yaml \
           --project=${{ secrets.GCP_PROJECT_ID }} \
-          --region=us-central1
+          --region=us-central1 \
+          --substitutions=SHORT_SHA=${GITHUB_SHA::7},_BUILD_ARTIFACTS=${{ steps.changes.outputs.services }}
