@@ -12,7 +12,7 @@ currencyService:
 emailService:
   tag: "4afe090"
 frontend:
-  tag: "4afe090"
+  tag: "caf505e"
 loadGenerator:
   tag: "4afe090"
 paymentService:
