@@ -55,10 +55,11 @@ jobs:
         workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
         service_account: ${{ secrets.WIF_SERVICE_ACCOUNT }}
     - uses: google-github-actions/setup-gcloud@v2
-    - name: Build images via Cloud Build
+    - name: Build and push images via Cloud Build
       timeout-minutes: 30
       run: |
         gcloud builds submit \
           --config=cloudbuild-pr.yaml \
           --project=${{ secrets.GCP_PROJECT_ID }} \
-          --region=us-central1
+          --region=us-central1 \
+          --substitutions=SHORT_SHA=${GITHUB_SHA::7}
