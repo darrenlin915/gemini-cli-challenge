@@ -21,7 +21,7 @@ jobs:
     steps:
     - uses: actions/checkout@v4
       with:
-        fetch-depth: 3
+        fetch-depth: 0
         token: ${{ secrets.GITHUB_TOKEN }}
 
     - name: Detect changed services and update Helm values
@@ -35,7 +35,7 @@ jobs:
           exit 0
         fi
 
-        CHANGED_DIRS=$(git diff --name-only HEAD^1...HEAD^2 -- src/ | cut -d'/' -f2 | sort -u)
+        CHANGED_DIRS=$(git diff --name-only HEAD^1..HEAD^2 -- src/ | cut -d'/' -f2 | sort -u)
 
         # Map directory names to Helm values keys
         declare -A DIR_TO_KEY=(
