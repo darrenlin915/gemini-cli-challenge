@@ -551,7 +551,6 @@ func (fe *frontendServer) chooseAd(ctx context.Context, ctxKeys []string, log lo
 	ads, err := fe.getAd(ctx, ctxKeys)
 	if err != nil {
 		log.WithField("error", err).Warn("failed to retrieve ads")
-		return nil
 	}
 	return ads[rand.Intn(len(ads))]
 }
