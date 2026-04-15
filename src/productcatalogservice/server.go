@@ -45,7 +45,7 @@ var (
 	log          *logrus.Logger
 	extraLatency time.Duration
 
-	port = "3550"
+	port = "3550" // default gRPC port
 
 	reloadCatalog bool
 )
