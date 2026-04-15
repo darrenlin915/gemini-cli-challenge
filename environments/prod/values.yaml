@@ -15,6 +15,7 @@ frontend:
   tag: "caf505e"
 loadGenerator:
   tag: "b610829"
+  replicas: 3
 paymentService:
   tag: "748bb04"
 productCatalogService:
