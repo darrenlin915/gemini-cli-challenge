@@ -1,4 +1,4 @@
 # Staging Environment Values
 images:
   repository: us-central1-docker.pkg.dev/ai-for-sre-demo/microservices-demo
-  tag: "latest"
+  tag: "f4a4581"
