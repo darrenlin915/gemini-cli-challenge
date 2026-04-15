@@ -1,24 +1,8 @@
-# Copyright 2020 Google LLC
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#      http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-
-name: "Continuous Integration - Main/Release"
+name: "CD - Main"
 on:
   push:
-    # run on pushes to main or release/*
     branches:
       - main
-      - release/*
     paths-ignore:
       - '**/README.md'
       - 'kustomize/**'
@@ -27,119 +11,64 @@ on:
       - '.github/workflows/terraform-validate-ci.yaml'
       - 'helm-chart/**'
       - '.github/workflows/helm-chart-ci.yaml'
-jobs:
-  code-tests:
-    runs-on: [self-hosted, is-enabled]
-    steps:
-    - uses: actions/checkout@v4
-    - uses: actions/setup-dotnet@v4
-      env:
-        DOTNET_INSTALL_DIR: "./.dotnet"
-      with:
-        dotnet-version: '9.0'
-    - uses: actions/setup-go@v5
-      with:
-        go-version: '1.24'
-    - name: Go Unit Tests
-      timeout-minutes: 10
-      run: |
-        for SERVICE in "shippingservice" "productcatalogservice"; do
-          echo "testing $SERVICE..."
-          pushd src/$SERVICE
-          go test
-          popd
-        done
-    - name: C# Unit Tests
-      timeout-minutes: 10
-      run: |
-        dotnet test src/cartservice/
-  deployment-tests:
-    runs-on: [self-hosted, is-enabled]
-    needs: code-tests
-    strategy:
-      matrix:
-        profile: ["local-code"]
-      fail-fast: true
-    steps:
-    - uses: actions/checkout@v4
-    - name: Build + Deploy PR images to GKE
-      timeout-minutes: 20
-      run: |
-        PR_NUMBER=$(echo $GITHUB_REF | awk 'BEGIN { FS = "/" } ; { print $3 }')
-        NAMESPACE="pr${PR_NUMBER}"
-        echo "::set-env name=NAMESPACE::$NAMESPACE"
-        echo "::set-env name=PR_NUMBER::$PR_NUMBER"
+      - 'environments/**'
 
-        yes | gcloud auth configure-docker us-docker.pkg.dev
-        gcloud container clusters get-credentials $PR_CLUSTER --region $REGION --project $PROJECT_ID
-        cat <<EOF | kubectl apply -f -
-        apiVersion: v1
-        kind: Namespace
-        metadata:
-          name: $NAMESPACE
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    outputs:
+      image_tag: ${{ steps.build.outputs.image_tag }}
+    steps:
+    - uses: actions/checkout@v4
+    - id: auth
+      uses: google-github-actions/auth@v2
+      with:
+        workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
+        service_account: ${{ secrets.WIF_SERVICE_ACCOUNT }}
+    - uses: google-github-actions/setup-gcloud@v2
+    - name: Build and push images via Cloud Build
+      id: build
+      timeout-minutes: 30
+      run: |
+        SHORT_SHA=${GITHUB_SHA::7}
+        echo "image_tag=$SHORT_SHA" >> "$GITHUB_OUTPUT"
+
+        gcloud builds submit \
+          --config=cloudbuild.yaml \
+          --project=${{ secrets.GCP_PROJECT_ID }} \
+          --region=us-central1 \
+          --substitutions=SHORT_SHA=$SHORT_SHA
+
+  update-helm-values:
+    runs-on: ubuntu-latest
+    needs: build-and-push
+    permissions:
+      contents: write
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+    - name: Update Helm values for ArgoCD
+      run: |
+        set -e
+        IMAGE_TAG=${{ needs.build-and-push.outputs.image_tag }}
+        PROJECT_ID=${{ secrets.GCP_PROJECT_ID }}
+
+        for ENV in dev staging prod; do
+          cat > environments/${ENV}/values.yaml <<EOF
+        # ${ENV^} Environment Values
+        images:
+          repository: us-central1-docker.pkg.dev/${PROJECT_ID}/microservices-demo
+          tag: "${IMAGE_TAG}"
         EOF
-        echo Deploying application
-        skaffold config set --global local-cluster false
-        skaffold run --default-repo=us-docker.pkg.dev/$PROJECT_ID/$GITHUB_REF --tag=$GITHUB_SHA --namespace=$NAMESPACE -p network-policies
-      env:
-        ACTIONS_ALLOW_UNSECURE_COMMANDS: true
-        PROJECT_ID: "online-boutique-ci"
-        PR_CLUSTER: "prs-gke-cluster"
-        REGION: "us-central1"
-    - name: Wait For Pods
-      timeout-minutes: 20
-      run: |
-        set -x
-        kubectl config set-context --current --namespace=$NAMESPACE
-        kubectl wait --for=condition=available --timeout=1000s deployment/redis-cart
-        kubectl wait --for=condition=available --timeout=1000s deployment/adservice
-        kubectl wait --for=condition=available --timeout=1000s deployment/cartservice
-        kubectl wait --for=condition=available --timeout=1000s deployment/checkoutservice
-        kubectl wait --for=condition=available --timeout=1000s deployment/currencyservice
-        kubectl wait --for=condition=available --timeout=1000s deployment/emailservice
-        kubectl wait --for=condition=available --timeout=1000s deployment/frontend
-        kubectl wait --for=condition=available --timeout=1000s deployment/loadgenerator
-        kubectl wait --for=condition=available --timeout=1000s deployment/paymentservice
-        kubectl wait --for=condition=available --timeout=1000s deployment/productcatalogservice
-        kubectl wait --for=condition=available --timeout=1000s deployment/recommendationservice
-        kubectl wait --for=condition=available --timeout=1000s deployment/shippingservice
-    - name: Smoke Test
-      timeout-minutes: 5
-      run: |
-        set -x
-        # start fresh loadgenerator pod
-        kubectl delete pod -l app=loadgenerator
-        # wait for requests to come in
-        REQUEST_COUNT="0"
-        while [[ "$REQUEST_COUNT"  -lt "50"  ]]; do
-            sleep 5
-            REQUEST_COUNT=$(kubectl logs -l app=loadgenerator | grep Aggregated | awk '{print $2}')
         done
-        # ensure there are no errors hitting endpoints
-        ERROR_COUNT=$(kubectl logs -l app=loadgenerator | grep Aggregated | awk '{print $3}' | sed "s/[(][^)]*[)]//g")
-        if [[ "$ERROR_COUNT" -gt "0" ]]; then
-          exit 1
-        fi
-    - name: ArgoCD GitOps Update Dev Environment
-      if: github.ref == 'refs/heads/main'
+    - name: Commit and push
       run: |
-        echo "Updating dev environment Helm values..."
-        
-        # Configure Git
         git config user.name "github-actions[bot]"
         git config user.email "github-actions[bot]@users.noreply.github.com"
-        
-        # Download yq
-        wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
-        chmod a+x /usr/local/bin/yq
-        
-        # Use GITHUB_SHA as the image tag
-        NEW_TAG=${GITHUB_SHA::7}
-        
-        # Update the values file
-        yq e ".images.tag = \"${NEW_TAG}\"" -i environments/dev/values.yaml
-        
-        # Commit and push
-        git add environments/dev/values.yaml
-        git commit -m "chore(gitops): auto-update dev environment image tag to ${NEW_TAG} [skip ci]" || echo "No changes"
+        git add environments/
+        git commit -m "chore(cd): update image tag to ${{ needs.build-and-push.outputs.image_tag }} [skip ci]"
         git push origin main
