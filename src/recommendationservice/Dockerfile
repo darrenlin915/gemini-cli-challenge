@@ -22,7 +22,7 @@ RUN apk update \
 
 # get packages
 COPY requirements.txt .
-RUN pip install -r requirements.txt
+RUN pip install -r requirements.txt setuptools
 
 FROM base
 # Enable unbuffered logging
