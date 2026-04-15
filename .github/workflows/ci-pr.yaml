@@ -99,4 +99,4 @@ jobs:
           --config=cloudbuild-pr.yaml \
           --project=${{ secrets.GCP_PROJECT_ID }} \
           --region=us-central1 \
-          --substitutions=SHORT_SHA=${GITHUB_SHA::7},_BUILD_ARTIFACTS=${{ needs.detect-changes.outputs.services }}
+          --substitutions="^::^SHORT_SHA=${GITHUB_SHA::7}::_BUILD_ARTIFACTS=${{ needs.detect-changes.outputs.services }}"
