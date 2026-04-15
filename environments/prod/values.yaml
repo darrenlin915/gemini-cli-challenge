@@ -2,24 +2,24 @@
 images:
   repository: us-central1-docker.pkg.dev/ai-for-sre-demo/microservices-demo
 adService:
-  tag: "4afe090"
+  tag: "b610829"
 cartService:
-  tag: "4afe090"
+  tag: "748bb04"
 checkoutService:
-  tag: "4afe090"
+  tag: "748bb04"
 currencyService:
-  tag: "4afe090"
+  tag: "748bb04"
 emailService:
-  tag: "4afe090"
+  tag: "b610829"
 frontend:
-  tag: "4afe090"
+  tag: "caf505e"
 loadGenerator:
-  tag: "4afe090"
+  tag: "b610829"
 paymentService:
-  tag: "4afe090"
+  tag: "748bb04"
 productCatalogService:
-  tag: "4afe090"
+  tag: "4dc6cab"
 recommendationService:
-  tag: "4afe090"
+  tag: "b610829"
 shippingService:
-  tag: "4afe090"
+  tag: "748bb04"
