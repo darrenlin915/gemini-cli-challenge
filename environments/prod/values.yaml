@@ -1,4 +1,25 @@
 # Prod Environment Values
 images:
   repository: us-central1-docker.pkg.dev/ai-for-sre-demo/microservices-demo
+adService:
+  tag: "4afe090"
+cartService:
+  tag: "4afe090"
+checkoutService:
+  tag: "4afe090"
+currencyService:
+  tag: "4afe090"
+emailService:
+  tag: "4afe090"
+frontend:
+  tag: "4afe090"
+loadGenerator:
+  tag: "4afe090"
+paymentService:
+  tag: "4afe090"
+productCatalogService:
+  tag: "4afe090"
+recommendationService:
+  tag: "4afe090"
+shippingService:
   tag: "4afe090"
