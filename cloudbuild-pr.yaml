@@ -1,11 +1,21 @@
+# Build and push container images to Artifact Registry.
+# Triggered by GitHub Actions via `gcloud builds submit`.
+# Images are tagged with SHORT_SHA so the CD pipeline can retag on merge.
+
 steps:
-- id: 'Build all containers'
+- id: 'Configure Docker auth'
+  name: 'gcr.io/cloud-builders/gcloud'
+  args: ['auth', 'configure-docker', 'us-central1-docker.pkg.dev', '--quiet']
+
+- id: 'Build and push images'
   name: 'gcr.io/k8s-skaffold/skaffold:v2.14.1'
   entrypoint: 'bash'
   args:
   - '-c'
   - >
-    skaffold build -f=skaffold.yaml -p ci --default-repo=us-central1-docker.pkg.dev/$PROJECT_ID/microservices-demo --build-concurrency=0;
+    skaffold build -f=skaffold.yaml -p ci
+    --default-repo=us-central1-docker.pkg.dev/$PROJECT_ID/microservices-demo
+    --tag=${SHORT_SHA} --build-concurrency=0;
 
 timeout: '3600s'
 options:
