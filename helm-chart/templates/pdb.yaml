@@ -1,0 +1,19 @@
+{{- $services := list "frontend" "cartService" "checkoutService" "productCatalogService" "currencyService" "emailService" "paymentService" "recommendationService" "shippingService" "adService" }}
+{{- range $svc := $services }}
+{{- $svcValues := index $.Values $svc }}
+{{- if and $svcValues.create (hasKey $svcValues "autoscaling") $svcValues.autoscaling.enabled }}
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ $svcValues.name }}
+  namespace: {{ $.Release.Namespace }}
+  labels:
+    app: {{ $svcValues.name }}
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: {{ $svcValues.name }}
+{{- end }}
+{{- end }}

@@ -58,9 +58,12 @@ jobs:
     - uses: actions/setup-dotnet@v4
       with:
         dotnet-version: '9.0'
+        cache: true
+        cache-dependency-path: src/cartservice/src/cartservice.csproj
     - uses: actions/setup-go@v5
       with:
         go-version: '1.24'
+        cache: true
     - name: Go Unit Tests
       timeout-minutes: 10
       run: |
