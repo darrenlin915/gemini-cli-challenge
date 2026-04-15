@@ -1,11 +1,34 @@
+# Build and push container images to Artifact Registry.
+# Triggered by GitHub Actions via `gcloud builds submit`.
+# Supports selective build via _BUILD_ARTIFACTS substitution.
+
 steps:
-- id: 'Build all containers'
+- id: 'Configure Docker auth'
+  name: 'gcr.io/cloud-builders/gcloud'
+  args: ['auth', 'configure-docker', 'us-central1-docker.pkg.dev', '--quiet']
+
+- id: 'Build and push images'
   name: 'gcr.io/k8s-skaffold/skaffold:v2.14.1'
   entrypoint: 'bash'
   args:
   - '-c'
-  - >
-    skaffold build -f=skaffold.yaml -p ci --default-repo=us-central1-docker.pkg.dev/$PROJECT_ID/microservices-demo --build-concurrency=0;
+  - |
+    BUILD_FLAGS=""
+    if [ -n "${_BUILD_ARTIFACTS}" ]; then
+      IFS=',' read -ra ARTIFACTS <<< "${_BUILD_ARTIFACTS}"
+      for art in "$${ARTIFACTS[@]}"; do
+        BUILD_FLAGS="$$BUILD_FLAGS -b $$art"
+      done
+      echo "Selective build: $${BUILD_FLAGS}"
+    else
+      echo "Building all artifacts"
+    fi
+    skaffold build -f=skaffold.yaml -p ci \
+      --default-repo=us-central1-docker.pkg.dev/$PROJECT_ID/microservices-demo \
+      --tag=${SHORT_SHA} --build-concurrency=0 $$BUILD_FLAGS
+
+substitutions:
+  _BUILD_ARTIFACTS: ''
 
 timeout: '3600s'
 options:

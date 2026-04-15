@@ -14,61 +14,69 @@ on:
       - 'environments/**'
 
 jobs:
-  build-and-push:
+  update-changed-services:
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      id-token: write
-    outputs:
-      image_tag: ${{ steps.build.outputs.image_tag }}
-    steps:
-    - uses: actions/checkout@v4
-    - id: auth
-      uses: google-github-actions/auth@v2
-      with:
-        workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
-        service_account: ${{ secrets.WIF_SERVICE_ACCOUNT }}
-    - uses: google-github-actions/setup-gcloud@v2
-    - name: Build and push images via Cloud Build
-      id: build
-      timeout-minutes: 30
-      run: |
-        SHORT_SHA=${GITHUB_SHA::7}
-        echo "image_tag=$SHORT_SHA" >> "$GITHUB_OUTPUT"
-
-        gcloud builds submit \
-          --config=cloudbuild.yaml \
-          --project=${{ secrets.GCP_PROJECT_ID }} \
-          --region=us-central1 \
-          --substitutions=SHORT_SHA=$SHORT_SHA
-
-  update-helm-values:
-    runs-on: ubuntu-latest
-    needs: build-and-push
     permissions:
       contents: write
     steps:
     - uses: actions/checkout@v4
       with:
+        fetch-depth: 3
         token: ${{ secrets.GITHUB_TOKEN }}
-    - name: Update Helm values for ArgoCD
+
+    - name: Detect changed services and update Helm values
       run: |
         set -e
-        IMAGE_TAG=${{ needs.build-and-push.outputs.image_tag }}
-        PROJECT_ID=${{ secrets.GCP_PROJECT_ID }}
 
-        for ENV in dev staging prod; do
-          cat > environments/${ENV}/values.yaml <<EOF
-        # ${ENV^} Environment Values
-        images:
-          repository: us-central1-docker.pkg.dev/${PROJECT_ID}/microservices-demo
-          tag: "${IMAGE_TAG}"
-        EOF
+        # Detect which services changed in this merge
+        PR_SHA=$(git rev-parse HEAD^2 2>/dev/null | head -c 7 || echo "")
+        if [ -z "$PR_SHA" ]; then
+          echo "::warning::Not a merge commit — no services to update"
+          exit 0
+        fi
+
+        CHANGED_DIRS=$(git diff --name-only HEAD^1...HEAD^2 -- src/ | cut -d'/' -f2 | sort -u)
+
+        # Map directory names to Helm values keys
+        declare -A DIR_TO_KEY=(
+          [adservice]=adService
+          [cartservice]=cartService
+          [checkoutservice]=checkoutService
+          [currencyservice]=currencyService
+          [emailservice]=emailService
+          [frontend]=frontend
+          [loadgenerator]=loadGenerator
+          [paymentservice]=paymentService
+          [productcatalogservice]=productCatalogService
+          [recommendationservice]=recommendationService
+          [shippingservice]=shippingService
+        )
+
+        UPDATED=""
+        for dir in $CHANGED_DIRS; do
+          KEY="${DIR_TO_KEY[$dir]}"
+          if [ -n "$KEY" ]; then
+            UPDATED="${UPDATED:+$UPDATED, }$dir"
+            # Update per-service tag in all environment values files
+            for ENV_FILE in environments/*/values.yaml; do
+              sed -i "/^${KEY}:/,/^[a-zA-Z]/{s/tag: \".*\"/tag: \"${PR_SHA}\"/}" "$ENV_FILE"
+            done
+          fi
         done
+
+        if [ -z "$UPDATED" ]; then
+          echo "No service source code changes — skipping"
+          exit 0
+        fi
+
+        echo "Updated services: $UPDATED (tag: $PR_SHA)"
+
     - name: Commit and push
       run: |
         git config user.name "github-actions[bot]"
         git config user.email "github-actions[bot]@users.noreply.github.com"
         git add environments/
-        git commit -m "chore(cd): update image tag to ${{ needs.build-and-push.outputs.image_tag }} [skip ci]"
+        git diff --cached --quiet && echo "No changes to commit" && exit 0
+        PR_SHA=$(git rev-parse HEAD^2 2>/dev/null | head -c 7 || echo "unknown")
+        git commit -m "chore(cd): update changed service tags to ${PR_SHA} [skip ci]"
         git push origin main
