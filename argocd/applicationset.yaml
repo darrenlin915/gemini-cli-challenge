@@ -35,6 +35,9 @@ spec:
         automated:
           prune: true
           selfHeal: true
+        managedNamespaceMetadata:
+          annotations:
+            cloud.google.com/compute-class: online-boutique
         retry:
           limit: 3
           backoff:
