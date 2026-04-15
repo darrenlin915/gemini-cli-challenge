@@ -75,6 +75,11 @@ cartService:
   create: true
   name: cartservice
   tag: ""
+  autoscaling:
+    enabled: false
+    minReplicas: 2
+    maxReplicas: 5
+    targetCPUUtilization: 70
   resources:
     requests:
       cpu: 200m
@@ -87,6 +92,11 @@ checkoutService:
   create: true
   name: checkoutservice
   tag: ""
+  autoscaling:
+    enabled: false
+    minReplicas: 2
+    maxReplicas: 5
+    targetCPUUtilization: 70
   resources:
     requests:
       cpu: 100m
@@ -123,6 +133,11 @@ frontend:
   create: true
   name: frontend
   tag: ""
+  autoscaling:
+    enabled: false
+    minReplicas: 2
+    maxReplicas: 5
+    targetCPUUtilization: 70
   externalService: true
   cymbalBranding: false
   # One of: local, gcp, aws, azure, onprem, alibaba. When not set, defaults to "local" unless running in GKE, otherwise auto-sets to gcp.
@@ -174,6 +189,11 @@ productCatalogService:
   create: true
   name: productcatalogservice
   tag: ""
+  autoscaling:
+    enabled: false
+    minReplicas: 2
+    maxReplicas: 5
+    targetCPUUtilization: 70
   # Specifies an extra latency to any request on productcatalogservice, by default no extra latency.
   extraLatency: ""
   resources:

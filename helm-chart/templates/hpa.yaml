@@ -1,0 +1,28 @@
+{{- $services := list "frontend" "cartService" "checkoutService" "productCatalogService" "currencyService" "emailService" "paymentService" "recommendationService" "shippingService" "adService" }}
+{{- range $svc := $services }}
+{{- $svcValues := index $.Values $svc }}
+{{- if and $svcValues.create (hasKey $svcValues "autoscaling") $svcValues.autoscaling.enabled }}
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: {{ $svcValues.name }}
+  namespace: {{ $.Release.Namespace }}
+  labels:
+    app: {{ $svcValues.name }}
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: {{ $svcValues.name }}
+  minReplicas: {{ $svcValues.autoscaling.minReplicas | default 2 }}
+  maxReplicas: {{ $svcValues.autoscaling.maxReplicas | default 5 }}
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: {{ $svcValues.autoscaling.targetCPUUtilization | default 70 }}
+{{- end }}
+{{- end }}
