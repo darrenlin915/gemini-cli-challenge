@@ -13,8 +13,15 @@ on:
       - '.github/workflows/helm-chart-ci.yaml'
       - 'environments/**'
 
+# Serialize CD runs so two back-to-back merges don't race on `git push` to main.
+# cancel-in-progress: false (not true) — killing the in-flight run would lose
+# its tag bump entirely; we want every merge's tag update to land, in order.
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
 jobs:
-  update-changed-services:
+  update-dev:
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -32,20 +39,20 @@ jobs:
         fetch-depth: 0
         token: ${{ steps.app-token.outputs.token || secrets.GITHUB_TOKEN }}
 
-    - name: Detect changed services and update Helm values
+    - name: Detect changed services and update dev values
+      id: update
       run: |
-        set -e
+        set -euo pipefail
 
-        # Detect which services changed in this merge
         PR_SHA=$(git rev-parse HEAD^2 2>/dev/null | head -c 7 || echo "")
         if [ -z "$PR_SHA" ]; then
           echo "::warning::Not a merge commit — no services to update"
+          echo "updated=" >> "$GITHUB_OUTPUT"
           exit 0
         fi
 
         CHANGED_DIRS=$(git diff --name-only HEAD^1..HEAD^2 -- src/ | cut -d'/' -f2 | sort -u)
 
-        # Map directory names to Helm values keys
         declare -A DIR_TO_KEY=(
           [adservice]=adService
           [cartservice]=cartService
@@ -60,31 +67,41 @@ jobs:
           [shippingservice]=shippingService
         )
 
+        DEV_FILE=environments/dev/values.yaml
         UPDATED=""
         for dir in $CHANGED_DIRS; do
-          KEY="${DIR_TO_KEY[$dir]}"
+          KEY="${DIR_TO_KEY[$dir]:-}"
           if [ -n "$KEY" ]; then
             UPDATED="${UPDATED:+$UPDATED, }$dir"
-            # Update per-service tag in all environment values files
-            for ENV_FILE in environments/*/values.yaml; do
-              sed -i "/^${KEY}:/,/^[a-zA-Z]/{s/tag: \".*\"/tag: \"${PR_SHA}\"/}" "$ENV_FILE"
-            done
+            yq -i ".${KEY}.tag = \"${PR_SHA}\"" "$DEV_FILE"
           fi
         done
 
         if [ -z "$UPDATED" ]; then
           echo "No service source code changes — skipping"
+          echo "updated=" >> "$GITHUB_OUTPUT"
           exit 0
         fi
 
-        echo "Updated services: $UPDATED (tag: $PR_SHA)"
+        echo "updated=$UPDATED" >> "$GITHUB_OUTPUT"
+        echo "tag=$PR_SHA" >> "$GITHUB_OUTPUT"
+
+        {
+          echo "## Dev deploy"
+          echo ""
+          echo "**Tag:** \`$PR_SHA\`"
+          echo "**Services:** $UPDATED"
+          echo ""
+          echo "Staging and prod are unchanged. Use the \`Promote\` workflow to advance this tag."
+        } >> "$GITHUB_STEP_SUMMARY"
 
     - name: Commit and push
+      if: steps.update.outputs.updated != ''
       run: |
+        set -euo pipefail
         git config user.name "github-actions[bot]"
         git config user.email "github-actions[bot]@users.noreply.github.com"
-        git add environments/
+        git add environments/dev/values.yaml
         git diff --cached --quiet && echo "No changes to commit" && exit 0
-        PR_SHA=$(git rev-parse HEAD^2 2>/dev/null | head -c 7 || echo "unknown")
-        git commit -m "chore(cd): update changed service tags to ${PR_SHA} [skip ci]"
+        git commit -m "chore(cd): deploy ${{ steps.update.outputs.tag }} to dev (services: ${{ steps.update.outputs.updated }}) [skip ci]"
         git push origin main

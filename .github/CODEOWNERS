@@ -4,3 +4,8 @@
 # These owners will be the default owners for everything in
 # the repo. Unless a later match takes precedence.
 * @GoogleCloudPlatform/devrel-flagship-app-maintainers @yoshi-approver
+
+# Promotion gates: any change to staging/prod env values must be approved
+# by a code owner. The `Promote` workflow opens PRs against these paths.
+/environments/staging/ @darrenlin915
+/environments/prod/    @darrenlin915
