@@ -102,3 +102,25 @@ jobs:
           --project=${{ secrets.GCP_PROJECT_ID }} \
           --region=us-central1 \
           --substitutions="^::^SHORT_SHA=${PR_HEAD_SHA::7}::_BUILD_ARTIFACTS=${{ needs.detect-changes.outputs.services }}"
+
+  pr-deploy-preview:
+    needs: detect-changes
+    if: needs.detect-changes.outputs.has_src_changes == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+    steps:
+    - name: Post deploy preview comment
+      uses: marocchino/sticky-pull-request-comment@v2
+      with:
+        header: deploy-preview
+        message: |
+          ### Deploy preview
+
+          **Image tag on merge:** `${{ github.event.pull_request.head.sha }}` (truncated to 7 chars)
+
+          **Changed services:** `${{ needs.detect-changes.outputs.services }}`
+
+          On merge to `main`:
+          - **dev** will be updated automatically with the new tag and ArgoCD will sync `dev-onlineboutique`.
+          - **staging** and **prod** are unchanged. Promote with the [`Promote` workflow](${{ github.server_url }}/${{ github.repository }}/actions/workflows/promote.yaml) (`dev → staging`, then `staging → prod`).

@@ -41,3 +41,31 @@ kubectl apply -n argocd -f argocd/applicationset.yaml
 
 ## 5. CI 更新流程 (GitOps)
 未來在 CI Pipeline (例如 GitHub Actions) 建立好新的容器映像檔 (Image) 後，可以透過自動化腳本將新的 Image Tag 寫入對應環境的 `environments/<env>/values.yaml` 中，然後由 CI Bot 自動 Commit 並 Push 回這個 Git Repository。ArgoCD 將會自動偵測到這些 Git commit 變更，並同步發佈新版本到 Kubernetes。
+
+## 6. Promotion flow: dev → staging → prod
+
+The CI/CD pipeline gates promotion between environments to avoid every merge
+deploying straight to production.
+
+**Auto-deploy to dev (on merge to `main`)**
+- `.github/workflows/ci-main.yaml` detects which services changed in the merge
+  commit, writes the new short SHA into `environments/dev/values.yaml` only,
+  and pushes the update back to `main` with `[skip ci]`.
+- ArgoCD's `dev-onlineboutique` application picks up the change and syncs.
+- `staging` and `prod` values files are **not** touched.
+
+**Manual promotion to staging / prod**
+1. Verify `dev-onlineboutique` (or `staging-onlineboutique`) is **Healthy**
+   and **Synced** in ArgoCD and any smoke tests pass.
+2. From the GitHub Actions tab, run the **Promote** workflow with:
+   - `from = dev`, `to = staging`, **or**
+   - `from = staging`, `to = prod`.
+   (Only these two paths are accepted; skipping or reversing is rejected.)
+3. The workflow opens a PR titled `Promote <from> → <to>` containing only the
+   diff to `environments/<to>/values.yaml`.
+4. A code owner reviews and merges. ArgoCD then syncs the target environment.
+
+**Why this design:** copying tags between env files (rather than auto-bumping
+all envs) keeps prod behind a human checkpoint while still being a single-repo
+GitOps setup. The PR is the gate, not the workflow run, so review is auditable
+in the normal GitHub flow.
