@@ -41,17 +41,33 @@ jobs:
 
     - name: Detect changed services and update dev values
       id: update
+      env:
+        GH_TOKEN: ${{ steps.app-token.outputs.token || secrets.GITHUB_TOKEN }}
       run: |
         set -euo pipefail
 
-        PR_SHA=$(git rev-parse HEAD^2 2>/dev/null | head -c 7 || echo "")
-        if [ -z "$PR_SHA" ]; then
-          echo "::warning::Not a merge commit — no services to update"
-          echo "updated=" >> "$GITHUB_OUTPUT"
-          exit 0
+        # Resolve the PR head SHA and the diff range. Two cases:
+        #  - True merge commit (`gh pr merge --merge`): HEAD has 2 parents,
+        #    HEAD^2 is the PR head and HEAD^1..HEAD^2 is the PR's diff.
+        #  - Squash commit (`gh pr merge --squash`) or direct push: HEAD has
+        #    1 parent. We pull the PR number out of the commit subject
+        #    (GitHub's `(#N)` suffix) and look up the original head SHA via
+        #    the GitHub API so the tag matches the image PR CI built.
+        if git rev-parse --verify --quiet HEAD^2 >/dev/null; then
+          PR_SHA=$(git rev-parse HEAD^2 | head -c 7)
+          DIFF_RANGE="HEAD^1..HEAD^2"
+        else
+          PR_NUM=$(git log -1 --pretty=%s | sed -nE 's/.*\(#([0-9]+)\)$/\1/p')
+          if [ -z "$PR_NUM" ]; then
+            echo "::warning::HEAD is neither a merge commit nor a squash-PR commit — no services to update"
+            echo "updated=" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          PR_SHA=$(gh pr view "$PR_NUM" --json headRefOid --jq .headRefOid | head -c 7)
+          DIFF_RANGE="HEAD^1..HEAD"
         fi
 
-        CHANGED_DIRS=$(git diff --name-only HEAD^1..HEAD^2 -- src/ | cut -d'/' -f2 | sort -u)
+        CHANGED_DIRS=$(git diff --name-only "$DIFF_RANGE" -- src/ | cut -d'/' -f2 | sort -u)
 
         declare -A DIR_TO_KEY=(
           [adservice]=adService
