@@ -1,0 +1,120 @@
+name: "Promote"
+
+# Manual promotion: copy image tags from one env to the next and open a PR.
+# The PR — not this workflow run — is the human gate; reviewers approve in
+# GitHub, then merge triggers ArgoCD to sync the target environment.
+
+on:
+  workflow_dispatch:
+    inputs:
+      from:
+        description: "Source environment"
+        required: true
+        type: choice
+        options:
+          - dev
+          - staging
+      to:
+        description: "Target environment"
+        required: true
+        type: choice
+        options:
+          - staging
+          - prod
+
+jobs:
+  open-promotion-pr:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+    - name: Validate promotion path
+      run: |
+        FROM="${{ inputs.from }}"
+        TO="${{ inputs.to }}"
+        if [ "$FROM" = "dev" ] && [ "$TO" = "staging" ]; then
+          echo "Promoting dev → staging"
+        elif [ "$FROM" = "staging" ] && [ "$TO" = "prod" ]; then
+          echo "Promoting staging → prod"
+        else
+          echo "::error::Invalid promotion: ${FROM} → ${TO}. Allowed: dev→staging, staging→prod."
+          exit 1
+        fi
+
+    - name: Mint GitHub App token
+      id: app-token
+      if: ${{ vars.APP_ID }}
+      uses: actions/create-github-app-token@v2
+      with:
+        app-id: ${{ vars.APP_ID }}
+        private-key: ${{ secrets.APP_PRIVATE_KEY }}
+
+    - uses: actions/checkout@v4
+      with:
+        token: ${{ steps.app-token.outputs.token || secrets.GITHUB_TOKEN }}
+
+    - name: Copy image tags from ${{ inputs.from }} to ${{ inputs.to }}
+      id: copy
+      run: |
+        set -euo pipefail
+        FROM_FILE="environments/${{ inputs.from }}/values.yaml"
+        TO_FILE="environments/${{ inputs.to }}/values.yaml"
+
+        KEYS=(
+          adService cartService checkoutService currencyService emailService
+          frontend loadGenerator paymentService productCatalogService
+          recommendationService shippingService
+        )
+
+        for KEY in "${KEYS[@]}"; do
+          SRC_TAG=$(yq ".${KEY}.tag" "$FROM_FILE")
+          if [ "$SRC_TAG" = "null" ] || [ -z "$SRC_TAG" ]; then
+            echo "::warning::${KEY}.tag missing in ${FROM_FILE}, skipping"
+            continue
+          fi
+          # SRC_TAG comes back as a bare scalar (e.g. caf505e); quote it so
+          # the yq expression parses as a string assignment.
+          yq -i ".${KEY}.tag = \"${SRC_TAG}\"" "$TO_FILE"
+        done
+
+        if git diff --quiet "$TO_FILE"; then
+          echo "no_changes=true" >> "$GITHUB_OUTPUT"
+          echo "::notice::${{ inputs.to }} already matches ${{ inputs.from }} — nothing to promote."
+          exit 0
+        fi
+
+        echo "no_changes=false" >> "$GITHUB_OUTPUT"
+
+        {
+          echo "## Promotion: ${{ inputs.from }} → ${{ inputs.to }}"
+          echo ""
+          echo "Diff for \`${TO_FILE}\`:"
+          echo ""
+          echo '```diff'
+          git diff "$TO_FILE"
+          echo '```'
+        } >> "$GITHUB_STEP_SUMMARY"
+
+    - name: Open promotion PR
+      if: steps.copy.outputs.no_changes == 'false'
+      uses: peter-evans/create-pull-request@v6
+      with:
+        token: ${{ steps.app-token.outputs.token || secrets.GITHUB_TOKEN }}
+        branch: promote/${{ inputs.from }}-to-${{ inputs.to }}-${{ github.run_id }}
+        base: main
+        commit-message: "chore(promote): ${{ inputs.from }} → ${{ inputs.to }}"
+        title: "Promote ${{ inputs.from }} → ${{ inputs.to }}"
+        body: |
+          Promoting image tags from `${{ inputs.from }}` to `${{ inputs.to }}`.
+
+          Triggered by @${{ github.actor }} via the `Promote` workflow ([run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})).
+
+          ### Pre-merge checklist
+          - [ ] `${{ inputs.from }}-onlineboutique` is **Healthy** and **Synced** in ArgoCD
+          - [ ] Smoke tests on `${{ inputs.from }}` pass
+          - [ ] Diff below matches expectations
+
+          See the workflow run summary for the full diff.
+        delete-branch: true
+        add-paths: environments/${{ inputs.to }}/values.yaml
