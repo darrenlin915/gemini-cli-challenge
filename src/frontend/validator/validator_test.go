@@ -156,6 +156,8 @@ func TestSetCurrencyPassesValidation(t *testing.T) {
 		{"valid currency (CAD)", "CAD"},
 		{"valid currency (AUD)", "AUD"},
 		{"valid currency (MXN)", "MXN"},
+		{"valid currency (CHF)", "CHF"},
+		{"valid currency (NZD)", "NZD"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
