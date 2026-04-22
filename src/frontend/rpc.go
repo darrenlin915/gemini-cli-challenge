@@ -92,7 +92,7 @@ func (fe *frontendServer) getShippingQuote(ctx context.Context, items []*pb.Cart
 	if err != nil {
 		return nil, err
 	}
-	localized, err := fe.convertCurrency(ctx, quote.GetCostUsd(), "USD")
+	localized, err := fe.convertCurrency(ctx, quote.GetCostUsd(), currency)
 	return localized, errors.Wrap(err, "failed to convert currency for shipping cost")
 }
 
