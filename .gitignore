@@ -31,3 +31,5 @@ vendor/
 
 # GitHub App credentials
 gha-creds-*.json
+
+.gemini/settings.json
